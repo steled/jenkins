@@ -1,19 +1,20 @@
 node {
-	def app
-	stage('Build Docker Image') {
-		checkout scm
-		app = docker.build('steled/sample-app:latest')
-	}
+    def app
+    def source
+    stage('Build Docker Image') {
+        source = checkout(scm)
+        app = docker.build("dockerhp/sample-app:${env.BUILD_ID}", "--label dockerhp.sample.commit=${source.GIT_COMMIT} .")
+    }
 
-	stage('Publish to Docker Hub') {
-		docker.withRegistry("https://index.docker.io/v1/", "dockerhub") {
-			app.push('latest')
-		}
-	}
+    stage('Publish to Docker Hub') {
+        docker.withRegistry("https://index.docker.io/v1/", "dockerhub") {
+            app.push(env.BUILD_ID)
+        }
+    }
 
-	stage('Deploy to Production') {
-		docker.withServer('tcp://production:2376', 'production') {
-			sh 'docker run -d steled/sample-app'
-		}
-	}
+    stage('Deploy to Production') {
+        docker.withServer('tcp://production:2376', 'production') {
+            sh "docker service update --image dockerhp/sample-app:${env.BUILD_ID} sample"
+        }
+    }
 }
